@@ -1,0 +1,13 @@
+# Brand / account configuration for the crew.
+# Fill this in with the real account details before a live run.
+
+account:
+  name: "Your Account Name"        # e.g. the Facebook Page name
+  platform: "facebook"             # facebook | instagram (publishing targets a FB Page)
+  niche: "your niche here"         # what the account is about, in a few words
+  topics:                          # recurring themes the Researcher should watch
+    - "topic one"
+    - "topic two"
+  tone: "friendly, clear, and helpful — no hype, no clickbait"
+  posts_per_run: 3                 # how many drafts the Writer should produce per run
+  hashtag_limit: 3                 # max hashtags per post (keeps posts non-spammy)

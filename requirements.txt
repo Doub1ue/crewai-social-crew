@@ -1,0 +1,4 @@
+crewai[google-genai]>=0.80
+python-dotenv>=1.0
+pyyaml>=6.0
+requests>=2.32
