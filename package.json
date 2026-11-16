@@ -1,0 +1,1 @@
+{"dependencies":{"canvas":"^3.1.0","two.js":"^0.8.18"},"description":"Two.js headless image-card renderer for the CrewAI social media crew (used by src/graphics.py).","main":"graphics/make_card.js","name":"crewai-social-crew-graphics","private":true,"version":"1.0.0"}

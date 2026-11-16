@@ -62,6 +62,18 @@ def main() -> int:
         md_path, json_path = run(args.topic)
 
     print(f"\nApproval queue written:\n  {md_path}\n  {json_path}")
+
+    # Draft image cards for the queued posts (Two.js headless via Node).
+    # Fail-soft: a graphics problem never loses the queue itself.
+    try:
+        from src.graphics import add_images_to_queue
+        made = add_images_to_queue(json_path)
+        if made:
+            print(f"Generated {made} draft image card(s) in output/images/ "
+                  "(paths recorded in the queue).")
+    except Exception as exc:  # noqa: BLE001
+        print(f"Image step skipped: {exc}")
+
     print("Review the drafts, set the good ones to \"approved\" in the JSON, "
           "then run: python src/publish.py   (dry run) ")
     return 0

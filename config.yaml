@@ -11,3 +11,14 @@ account:
   tone: "friendly, clear, and helpful — no hype, no clickbait"
   posts_per_run: 3                 # how many drafts the Writer should produce per run
   hashtag_limit: 3                 # max hashtags per post (keeps posts non-spammy)
+
+# Branding for the generated image cards (see graphics/make_card.js).
+# After each run, every queued post gets a PNG card in output/images/
+# drawn with these colors and the handle below.
+brand:
+  background_color: "#14213d"      # deep navy
+  text_color: "#ffffff"
+  accent_color: "#fca311"          # warm amber (top bar, divider, handle)
+  handle: "@yourhandle"            # shown at the bottom of every card
+  card_width: 1080                 # square, sized for Facebook / Instagram
+  card_height: 1080

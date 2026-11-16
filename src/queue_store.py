@@ -8,27 +8,46 @@ ROOT = Path(__file__).resolve().parent.parent
 OUTPUT_DIR = ROOT / "output"
 
 
-def save_queue(posts: list[str], source: str) -> tuple[Path, Path]:
+def _write_queue(payload: dict) -> tuple[Path, Path]:
     OUTPUT_DIR.mkdir(exist_ok=True)
-    stamp = datetime.now(timezone.utc).isoformat(timespec="seconds")
-    items = [
-        {"id": i + 1, "status": "pending", "text": text}
-        for i, text in enumerate(posts)
-    ]
-    payload = {"generated_at": stamp, "source": source, "posts": items}
 
     json_path = OUTPUT_DIR / "approval_queue.json"
     json_path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
 
     md_lines = [
         "# Approval queue",
-        f"_Generated {stamp} via {source}. "
+        f"_Generated {payload['generated_at']} via {payload['source']}. "
         "Change a post's status to \"approved\" in approval_queue.json "
         "before publishing._",
         "",
     ]
-    for item in items:
-        md_lines += [f"## Post {item['id']} — pending", "", item["text"], ""]
+    for item in payload["posts"]:
+        md_lines += [f"## Post {item['id']} — {item['status']}", "", item["text"], ""]
+        if item.get("image"):
+            rel = Path(item["image"]).name
+            md_lines += [f"![Post {item['id']} card](images/{rel})",
+                         f"_Image: {item['image']} (draft — not published)_", ""]
     md_path = OUTPUT_DIR / "approval_queue.md"
     md_path.write_text("\n".join(md_lines), encoding="utf-8")
     return md_path, json_path
+
+
+def save_queue(posts: list[str], source: str) -> tuple[Path, Path]:
+    stamp = datetime.now(timezone.utc).isoformat(timespec="seconds")
+    items = [
+        {"id": i + 1, "status": "pending", "text": text}
+        for i, text in enumerate(posts)
+    ]
+    payload = {"generated_at": stamp, "source": source, "posts": items}
+    return _write_queue(payload)
+
+
+def attach_images(images: dict[int, str]) -> tuple[Path, Path]:
+    """Record generated image-card paths on the existing queue, keeping
+    every other field (status included) exactly as it was."""
+    json_path = OUTPUT_DIR / "approval_queue.json"
+    payload = json.loads(json_path.read_text(encoding="utf-8"))
+    for item in payload["posts"]:
+        if item["id"] in images:
+            item["image"] = images[item["id"]]
+    return _write_queue(payload)
