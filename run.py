@@ -26,6 +26,17 @@ MODEL_KEYS = [
 ]
 
 
+def _vault_key_available() -> bool:
+    """True when the vault-held Gemini key (google-gemini connector) exists."""
+    try:
+        sys.path.insert(0, "/opt/muse/skills/custom-connector-setup/bin")
+        from dynamic_credentials import dynamic_credential_entry
+        dynamic_credential_entry("custom.google-gemini")
+        return True
+    except Exception:
+        return False
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="CrewAI social media crew")
     parser.add_argument("--demo", action="store_true",
@@ -39,12 +50,12 @@ def main() -> int:
         md_path, json_path = run_demo()
     else:
         import os
-        if not any(os.getenv(k) for k in MODEL_KEYS):
+        if not any(os.getenv(k) for k in MODEL_KEYS) and not _vault_key_available():
             print(
-                "No model API key found in .env.\n"
+                "No model API key found in .env and no vault Gemini key.\n"
                 "Copy .env.example to .env and add ONE key (Gemini and Groq "
-                "have free tiers), or run `python run.py --demo` to see the "
-                "workflow without a key."
+                "have free tiers), connect the google-gemini connector, or "
+                "run `python run.py --demo` to see the workflow without a key."
             )
             return 1
         from src.crew import run

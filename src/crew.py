@@ -20,10 +20,48 @@ def load_config() -> dict:
         return yaml.safe_load(fh)["account"]
 
 
-def build_llm() -> LLM:
-    """Pick the model from .env. CrewAI/LiteLLM reads the provider key
-    (GOOGLE_API_KEY, GROQ_API_KEY, OPENAI_API_KEY, ...) from the environment."""
-    model = os.getenv("MODEL_NAME", "gemini/gemini-2.0-flash")
+def _sanitize_no_proxy() -> None:
+    """httpx (used by the google-genai client) crashes parsing IPv6 entries
+    like [::1] in NO_PROXY. Drop colon/bracket entries for this process;
+    the egress proxy is still used for external hosts like Google."""
+    for var in ("NO_PROXY", "no_proxy"):
+        raw = os.getenv(var)
+        if raw:
+            kept = [e.strip() for e in raw.split(",")
+                    if e.strip() and ":" not in e and "[" not in e]
+            os.environ[var] = ",".join(kept)
+
+
+def _vault_gemini_surrogate() -> str | None:
+    """Fetch the hsurr:* surrogate for the vault-held Gemini key, if the
+    google-gemini connector is set up. The surrogate is not the real key:
+    it is swapped for the real key on approved egress to Google, so the
+    real key never touches this process, a file, or an env var."""
+    try:
+        import sys
+        sys.path.insert(0, "/opt/muse/skills/custom-connector-setup/bin")
+        from dynamic_credentials import dynamic_credential_entry
+        entry = dynamic_credential_entry("custom.google-gemini")
+        return str(entry["surrogate"])
+    except Exception:
+        return None
+
+
+def build_llm():
+    """Model from .env (MODEL_NAME).
+
+    Gemini keys, in order: GOOGLE_API_KEY from .env (native provider), or
+    the vault-held key via the google-gemini connector (VaultGeminiLLM —
+    the real key never leaves secure storage). Other providers use
+    CrewAI's native routing with their key from the environment."""
+    model = os.getenv("MODEL_NAME", "gemini/gemini-3.5-flash-lite")
+    _sanitize_no_proxy()
+    if model.startswith("gemini/") and not os.getenv("GOOGLE_API_KEY"):
+        if _vault_gemini_surrogate():
+            from src.vault_llm import VaultGeminiLLM
+            return VaultGeminiLLM(
+                model=model.split("/", 1)[1], temperature=0.7
+            )
     return LLM(model=model, temperature=0.7)
 
 
