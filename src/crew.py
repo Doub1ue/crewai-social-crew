@@ -1,4 +1,5 @@
-"""CrewAI social media crew: Researcher -> Writer -> Editor -> approval queue.
+"""CrewAI social media crew: Scout (Researcher) -> Quill (Writer) ->
+Ruby (Editor) -> approval queue.
 
 Nothing in this module publishes anything. The crew's only output is a
 draft approval queue in output/approval_queue.md / .json, which a human
@@ -106,13 +107,14 @@ def build_crew(topic: str | None = None) -> Crew:
     from src.tavily_tool import TavilySearchTool
 
     researcher = Agent(
-        role="Social Media Trend Researcher",
+        role="Scout — Social Media Trend Researcher",
         goal=(
             f"Find timely, specific topics and angles in the niche "
             f"'{cfg['niche']}' that the account '{cfg['name']}' could post "
             f"about today, focused on: {focus}."
         ),
         backstory=(
+            "You are Scout, the crew's researcher. "
             "You track what people in this niche are actually talking about. "
             "You have a live web search tool (Tavily) and you use it to "
             "ground every angle in something real and current. "
@@ -125,13 +127,14 @@ def build_crew(topic: str | None = None) -> Crew:
     )
 
     writer = Agent(
-        role="Social Media Content Writer",
+        role="Quill — Social Media Content Writer",
         goal=(
             f"Write {cfg['posts_per_run']} short, platform-ready draft posts "
             f"for {cfg['platform']} in this tone: {cfg['tone']}. "
             f"Use at most {cfg['hashtag_limit']} hashtags per post."
         ),
         backstory=(
+            "You are Quill, the crew's writer. "
             "You write like a helpful human, not a marketing bot: plain words, "
             "one clear idea per post, no engagement bait, no fake urgency, "
             "no promising results you cannot back up."
@@ -141,13 +144,14 @@ def build_crew(topic: str | None = None) -> Crew:
     )
 
     editor = Agent(
-        role="Editor and Safety Reviewer",
+        role="Ruby — Editor and Safety Reviewer",
         goal=(
             "Review every draft: fix tone and clarity, and REJECT anything "
             "spammy, misleading, off-brand, or likely to get the account "
             "flagged. Output only the surviving drafts in the required format."
         ),
         backstory=(
+            "You are Ruby, the crew's editor, named for your red pen. "
             "You are the last line of defense for the account's reputation. "
             "When in doubt, you cut the post. You know platform rules punish "
             "spam and inauthentic behavior, so every post must read as genuine."

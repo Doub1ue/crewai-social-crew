@@ -7,14 +7,17 @@ published. Built for Anthony (GitHub: Doub1ue) with Muse.
 ## How it works
 
 ```
-Researcher  ->  Writer  ->  Editor/Reviewer  ->  Approval queue  ->  (you approve)  ->  Publisher
+Scout (Researcher)  ->  Quill (Writer)  ->  Ruby (Editor/Reviewer)  ->  Approval queue  ->  (you approve)  ->  Publisher
 ```
 
-1. **Trend Researcher** — finds timely topics in your niche and angles worth posting about.
+The crew has names: **Scout** researches, **Quill** writes, and **Ruby**
+(named for her red pen) edits and reviews.
+
+1. **Trend Researcher — Scout** — finds timely topics in your niche and angles worth posting about.
    It has a live web-search tool (Tavily), so its angles are grounded in current
    results with source URLs, not just the model's training knowledge.
-2. **Content Writer** — turns the research into short, platform-ready draft posts.
-3. **Editor / Reviewer** — checks tone, clarity, and safety; removes anything spammy,
+2. **Content Writer — Quill** — turns the research into short, platform-ready draft posts.
+3. **Editor / Reviewer — Ruby** — checks tone, clarity, and safety; removes anything spammy,
    misleading, or off-brand; writes the survivors into the approval queue.
 4. **Approval queue** — drafts land in `output/approval_queue.md` (and `.json`).
    Nothing is published from the queue automatically.
@@ -92,7 +95,7 @@ only ever touches `"approved"` items, and only with `--confirm`.
 - Draft-and-approve by design — no fully autonomous posting.
 - No passwords stored or used; publishing uses official API tokens only.
 - `.env` is git-ignored — keys never go into this repo.
-- The Editor agent is instructed to reject spam, engagement bait, and
+- The Editor (Ruby) is instructed to reject spam, engagement bait, and
   anything that could get the account flagged.
 
 ## Project layout
@@ -112,7 +115,7 @@ src/
   vault_llm.py       Gemini LLM using the vault-held key (surrogate auth)
   vault_openrouter_llm.py  OpenRouter free-model LLM (vault key, fallback)
   fallback_llm.py    Wraps the primary LLM, falls back to OpenRouter
-  tavily_tool.py     Tavily web-search tool for the Researcher (vault key)
+  tavily_tool.py     Tavily web-search tool for Scout, the Researcher (vault key)
   tavily_search.py   Plain-function Tavily search helper (non-crew use)
 graphics/
   make_card.js       Two.js headless renderer: one PNG card per post

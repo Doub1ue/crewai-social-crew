@@ -1,6 +1,6 @@
-"""TavilySearchTool: live web search for the CrewAI Researcher agent.
+"""TavilySearchTool: live web search for Scout, the CrewAI Researcher agent.
 
-Wired into src/crew.py (Researcher agent only). The Researcher otherwise
+Wired into src/crew.py (Scout's agent only). Scout otherwise
 reasons from training knowledge alone; this tool gives it live Tavily
 results (1 credit per basic search on the Researcher plan, 1,000/month).
 
