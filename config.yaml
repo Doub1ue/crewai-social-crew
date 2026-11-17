@@ -1,13 +1,17 @@
 # Brand / account configuration for the crew.
-# Fill this in with the real account details before a live run.
+# Set on 2026-11-17 with best-judgment defaults (World, at Anthony's
+# request) around his ANPayment identity. Edit freely — the crew and the
+# card graphics read everything from here.
 
 account:
-  name: "Your Account Name"        # e.g. the Facebook Page name
+  name: "ANPayment"                # e.g. the Facebook Page name
   platform: "facebook"             # facebook | instagram (publishing targets a FB Page)
-  niche: "your niche here"         # what the account is about, in a few words
+  niche: "practical productivity and free tools for small business owners and freelancers"
   topics:                          # recurring themes the Researcher should watch
-    - "topic one"
-    - "topic two"
+    - "staying on top of email and daily tasks"
+    - "free and low-cost tools for small businesses"
+    - "posting consistently on social media without burning out"
+    - "simple AI tips for everyday business work"
   tone: "friendly, clear, and helpful — no hype, no clickbait"
   posts_per_run: 3                 # how many drafts the Writer should produce per run
   hashtag_limit: 3                 # max hashtags per post (keeps posts non-spammy)
@@ -19,6 +23,6 @@ brand:
   background_color: "#14213d"      # deep navy
   text_color: "#ffffff"
   accent_color: "#fca311"          # warm amber (top bar, divider, handle)
-  handle: "@yourhandle"            # shown at the bottom of every card
+  handle: "@anpayment"             # shown at the bottom of every card
   card_width: 1080                 # square, sized for Facebook / Instagram
   card_height: 1080
