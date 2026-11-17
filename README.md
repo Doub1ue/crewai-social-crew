@@ -8,10 +8,12 @@ published. Built for Anthony (GitHub: Doub1ue) with Muse.
 
 ```
 Scout (Researcher)  ->  Quill (Writer)  ->  Ruby (Editor/Reviewer)  ->  Approval queue  ->  (you approve)  ->  Publisher
+                                                    |
+                                                    +-->  Reel (Video Producer, optional)  ->  video packages + draft MP4s
 ```
 
-The crew has names: **Scout** researches, **Quill** writes, and **Ruby**
-(named for her red pen) edits and reviews.
+The crew has names: **Scout** researches, **Quill** writes, **Ruby**
+(named for her red pen) edits and reviews, and **Reel** produces video.
 
 1. **Trend Researcher — Scout** — finds timely topics in your niche and angles worth posting about.
    It has a live web-search tool (Tavily), so its angles are grounded in current
@@ -28,7 +30,25 @@ The crew has names: **Scout** researches, **Quill** writes, and **Ruby**
    `config.yaml` (`brand:` section), and its path is recorded as `"image"`
    in `approval_queue.json` and shown in the `.md`. Cards are drafts too —
    generating them publishes nothing.
-6. **Publisher** (`src/publish.py`) — posts *approved* items to a Facebook Page
+6. **Video — Reel (optional, `--video`)** — Reel, the Video Producer &
+   Animator, runs as an extra step after Ruby and turns each surviving
+   post into a *video package*: a hook-first short-form script, a scene
+   list, burned-in caption segments, and — only when a topic genuinely
+   suits a 3–8 minute video — a YouTube long-form outline. Packages are
+   recorded in the queue as `"video_package"`. The render step
+   (`src/video.py`, system **ffmpeg** — no extra Python dependencies)
+   then animates the post's branded card with a slow zoom/pan and draws
+   the captions on screen in sequence, producing two finished MP4s per
+   post in `output/videos/`: **vertical 1080×1920** for TikTok / YouTube
+   Shorts and **horizontal 1920×1080** for YouTube, recorded in the queue
+   as `"video"`. In demo mode (no model), packages are derived from the
+   post text instead, so the video step still runs end to end. Videos are
+   drafts too — rendering publishes nothing.
+   **Publishing to YouTube/TikTok is not wired up yet.** YouTube upload
+   will need Anthony's channel sign-in (OAuth) later; TikTok's posting
+   API is restricted, so for now the crew makes finished files that a
+   human uploads.
+7. **Publisher** (`src/publish.py`) — posts *approved* items to a Facebook Page
    via Meta's official Graph API. It runs in dry-run mode unless you pass
    `--confirm` and have set a Page access token. There is no password-based
    posting anywhere in this project.
@@ -49,6 +69,9 @@ The crew has names: **Scout** researches, **Quill** writes, and **Ruby**
   no card) via the vault-held key in the custom.tavily connector.
 - Facebook/Instagram posting via Meta's API: free. X (Twitter) is not
   included — its API is effectively paywalled.
+- **Video rendering: free** — the system `ffmpeg` binary does the work;
+  no paid video service and no extra Python packages. If ffmpeg is
+  missing, runs still work — the video step is skipped with a warning.
 
 ## Setup
 
@@ -74,6 +97,15 @@ python run.py --demo
 
 # Real run (uses the model/key from .env):
 python run.py --topic "your topic or campaign"
+
+# Real run + Reel's video packages and draft MP4s (TikTok/Shorts + YouTube):
+python run.py --video
+
+# Demo + videos, no API key (packages derived from the sample text):
+python run.py --demo --video
+
+# Render videos for the queue that already exists (optionally one post):
+python src/video.py [--post 1]
 
 # Review what the crew produced:
 cat output/approval_queue.md
@@ -101,16 +133,17 @@ only ever touches `"approved"` items, and only with `--confirm`.
 ## Project layout
 
 ```
-run.py               Entry point (--demo for the no-key sample run)
+run.py               Entry point (--demo for the no-key sample run, --video for Reel + MP4s)
 config.yaml          Your brand: account, niche, tone, cadence, card colors
 requirements.txt     Python dependencies
 package.json         Node dependencies for the image step (two.js, canvas)
 .env.example         Template for your keys (copy to .env)
 src/
-  crew.py            The CrewAI agents, tasks, and crew
+  crew.py            The CrewAI agents (Scout, Quill, Ruby, Reel), tasks, and crew
   demo.py            No-key demo that produces a sample approval queue
   queue_store.py     Approval-queue writing (shared by crew and demo)
   graphics.py        Runs the Two.js card renderer, records image paths
+  video.py           Reel's render step: ffmpeg MP4s (vertical + horizontal)
   publish.py         Meta Graph API publisher (dry-run by default)
   vault_llm.py       Gemini LLM using the vault-held key (surrogate auth)
   vault_openrouter_llm.py  OpenRouter free-model LLM (vault key, fallback)

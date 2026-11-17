@@ -27,6 +27,21 @@ def _write_queue(payload: dict) -> tuple[Path, Path]:
             rel = Path(item["image"]).name
             md_lines += [f"![Post {item['id']} card](images/{rel})",
                          f"_Image: {item['image']} (draft — not published)_", ""]
+        package = item.get("video_package")
+        if package:
+            md_lines += [f"**Video package (Reel):** hook — {package.get('hook', '')}", ""]
+            for seg in package.get("captions") or []:
+                md_lines.append(f"- Caption: {seg}")
+            for scene in package.get("scenes") or []:
+                md_lines.append(f"- Scene: {scene}")
+            if package.get("youtube_outline"):
+                md_lines.append(f"- YouTube outline: {package['youtube_outline']}")
+            md_lines.append("")
+        if item.get("video"):
+            for label, rel_path in item["video"].items():
+                md_lines.append(
+                    f"- Video ({label}): [{rel_path}](videos/{Path(rel_path).name})")
+            md_lines += ["_Videos are drafts — not published._", ""]
     md_path = OUTPUT_DIR / "approval_queue.md"
     md_path.write_text("\n".join(md_lines), encoding="utf-8")
     return md_path, json_path
@@ -50,4 +65,16 @@ def attach_images(images: dict[int, str]) -> tuple[Path, Path]:
     for item in payload["posts"]:
         if item["id"] in images:
             item["image"] = images[item["id"]]
+    return _write_queue(payload)
+
+
+def attach_videos(updates: dict[int, dict]) -> tuple[Path, Path]:
+    """Merge video data onto the existing queue: updates maps a post id to
+    fields to set on that item ("video" paths and/or "video_package").
+    Every other field (status included) is kept exactly as it was."""
+    json_path = OUTPUT_DIR / "approval_queue.json"
+    payload = json.loads(json_path.read_text(encoding="utf-8"))
+    for item in payload["posts"]:
+        if item["id"] in updates:
+            item.update(updates[item["id"]])
     return _write_queue(payload)

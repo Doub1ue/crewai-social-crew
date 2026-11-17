@@ -5,6 +5,7 @@ Usage:
   python run.py --demo              # sample queue, no API key needed
   python run.py                     # real crew run (needs a model key in .env)
   python run.py --topic "launch"    # real run focused on one topic
+  python run.py --video             # also: Reel's video packages + MP4 renders
 """
 import argparse
 import sys
@@ -43,6 +44,9 @@ def main() -> int:
                         help="produce a sample approval queue without any API key")
     parser.add_argument("--topic", default=None,
                         help="focus the crew on one topic or campaign")
+    parser.add_argument("--video", action="store_true",
+                        help="also produce video packages (Reel) and render "
+                             "draft MP4s into output/videos/")
     args = parser.parse_args()
 
     if args.demo:
@@ -59,7 +63,7 @@ def main() -> int:
             )
             return 1
         from src.crew import run
-        md_path, json_path = run(args.topic)
+        md_path, json_path = run(args.topic, with_video=args.video)
 
     print(f"\nApproval queue written:\n  {md_path}\n  {json_path}")
 
@@ -73,6 +77,20 @@ def main() -> int:
                   "(paths recorded in the queue).")
     except Exception as exc:  # noqa: BLE001
         print(f"Image step skipped: {exc}")
+
+    # Draft videos for the queued posts (ffmpeg; Reel's packages when a
+    # real crew run produced them, captions derived from the text
+    # otherwise). Fail-soft, same as the image step.
+    if args.video:
+        try:
+            from src.video import add_videos_to_queue
+            made = add_videos_to_queue(json_path)
+            if made:
+                print(f"Generated draft videos for {made} post(s) in "
+                      "output/videos/ (vertical + horizontal, paths "
+                      "recorded in the queue).")
+        except Exception as exc:  # noqa: BLE001
+            print(f"Video step skipped: {exc}")
 
     print("Review the drafts, set the good ones to \"approved\" in the JSON, "
           "then run: python src/publish.py   (dry run) ")

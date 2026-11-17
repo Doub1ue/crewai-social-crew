@@ -1,5 +1,8 @@
 """CrewAI social media crew: Scout (Researcher) -> Quill (Writer) ->
-Ruby (Editor) -> approval queue.
+Ruby (Editor) -> approval queue, plus an optional video step:
+Reel (Video Producer & Animator) turns each surviving post into a
+short-form video package (hook-first script, scenes, captions, and a
+YouTube outline when the topic suits) that src/video.py renders to MP4.
 
 Nothing in this module publishes anything. The crew's only output is a
 draft approval queue in output/approval_queue.md / .json, which a human
@@ -11,7 +14,7 @@ from pathlib import Path
 import yaml
 from crewai import Agent, Crew, LLM, Process, Task
 
-from src.queue_store import save_queue
+from src.queue_store import attach_videos, save_queue
 
 ROOT = Path(__file__).resolve().parent.parent
 
@@ -222,7 +225,116 @@ def parse_posts(text: str) -> list[str]:
     return [p for p in posts if p]
 
 
-def run(topic: str | None = None) -> tuple[Path, Path]:
+def parse_video_packages(text: str) -> dict[int, dict]:
+    """Parse Reel's PACKAGE...ENDPACKAGE blocks into {post_id: package}.
+
+    Block format (one field per line; CAPTIONS/SCENES are '|'-separated):
+        PACKAGE
+        POST: 1
+        HOOK: <one-line hook>
+        CAPTIONS: <segment> | <segment> | ...
+        SCENES: <scene> | <scene> | ...
+        YOUTUBE: <long-form outline, or NONE>
+        ENDPACKAGE
+    """
+    packages: dict[int, dict] = {}
+    current: dict | None = None
+    for line in text.splitlines():
+        stripped = line.strip()
+        if stripped == "PACKAGE":
+            current = {"captions": [], "scenes": [], "youtube_outline": None}
+        elif stripped == "ENDPACKAGE" and current is not None:
+            post_id = current.pop("post_id", None)
+            if post_id is not None and current.get("hook"):
+                packages[post_id] = current
+            current = None
+        elif current is not None and ":" in stripped:
+            key, _, value = stripped.partition(":")
+            key, value = key.strip().upper(), value.strip()
+            if key == "POST":
+                try:
+                    current["post_id"] = int(value)
+                except ValueError:
+                    pass
+            elif key == "HOOK":
+                current["hook"] = value
+            elif key == "CAPTIONS":
+                current["captions"] = [s.strip() for s in value.split("|") if s.strip()]
+            elif key == "SCENES":
+                current["scenes"] = [s.strip() for s in value.split("|") if s.strip()]
+            elif key == "YOUTUBE":
+                current["youtube_outline"] = None if value.upper() == "NONE" else value
+    return packages
+
+
+def run_video_step(posts: list[str]) -> dict[int, dict]:
+    """Reel's optional step: one video package per surviving post.
+
+    Runs as its own small crew AFTER Ruby's edit, so the existing
+    Scout -> Quill -> Ruby flow (and the demo) are untouched. Packages
+    are drafts for the approval queue; rendering happens in src/video.py.
+    """
+    cfg = load_config()
+    llm = build_llm()
+
+    producer = Agent(
+        role="Reel — Video Producer and Animator",
+        goal=(
+            "Turn each finished post into a short-form video package for "
+            "TikTok and YouTube Shorts: a hook that lands in the first two "
+            "seconds, caption segments that read well burned into video, "
+            "and a simple scene list the renderer can follow. When — and "
+            "only when — a topic genuinely suits a 3-8 minute YouTube "
+            "video, add a short long-form outline for it."
+        ),
+        backstory=(
+            "You are Reel, the crew's video producer and animator. "
+            "You think in vertical video: hook first, one idea per beat, "
+            "captions doing the talking because most people watch on mute. "
+            "You keep every claim exactly as Ruby approved it — you never "
+            "add hype, statistics, or promises that are not in the post. "
+            "Your visuals are honest about the format: an animated branded "
+            "card with a slow zoom, not fake footage of things that did "
+            "not happen."
+        ),
+        llm=llm,
+        allow_delegation=False,
+    )
+
+    numbered = "\n\n".join(
+        f"POST {i + 1}:\n{text}" for i, text in enumerate(posts))
+    video_task = Task(
+        description=(
+            "For EACH post below, write one video package. The videos are "
+            "animated branded cards (slow zoom/pan) with your captions "
+            "burned in, rendered vertically for TikTok/YouTube Shorts and "
+            "horizontally for YouTube. Output each package in EXACTLY "
+            "this format, nothing else:\n\n"
+            "PACKAGE\n"
+            "POST: <post number>\n"
+            "HOOK: <one short line, under 12 words, that stops the scroll>\n"
+            "CAPTIONS: <segment> | <segment> | <segment> "
+            "(3-5 segments, each under 8 words, covering the post's idea "
+            "in order)\n"
+            "SCENES: <scene> | <scene> | <scene> (short visual beats that "
+            "match the captions; the card animation plus simple, honest "
+            "visual ideas — no invented footage)\n"
+            "YOUTUBE: <a one-or-two-sentence outline for a 3-8 minute "
+            "YouTube video IF this topic truly suits long-form, "
+            "otherwise NONE>\n"
+            "ENDPACKAGE\n\n"
+            f"Posts:\n{numbered}"
+        ),
+        expected_output="One PACKAGE...ENDPACKAGE block per post, in the exact format specified.",
+        agent=producer,
+    )
+
+    crew = Crew(agents=[producer], tasks=[video_task],
+                process=Process.sequential, verbose=True)
+    return parse_video_packages(str(crew.kickoff()))
+
+
+def run(topic: str | None = None, with_video: bool = False) -> tuple[Path, Path]:
     result = build_crew(topic).kickoff()
     posts = parse_posts(str(result))
     if not posts:
@@ -230,4 +342,21 @@ def run(topic: str | None = None) -> tuple[Path, Path]:
             "The crew finished but produced no POST blocks. "
             "Re-run, or check the model output above."
         )
-    return save_queue(posts, source=f"crewai:{os.getenv('MODEL_NAME', 'default')}")
+    md_path, json_path = save_queue(
+        posts, source=f"crewai:{os.getenv('MODEL_NAME', 'default')}")
+    if with_video:
+        # Optional step after Ruby: Reel's packages join the queue so the
+        # render step (run.py --video) uses them. Fail-soft: a video
+        # problem never loses the posts themselves.
+        try:
+            packages = run_video_step(posts)
+            if packages:
+                attach_videos({pid: {"video_package": pkg}
+                               for pid, pkg in packages.items()})
+                print(f"Reel produced {len(packages)} video package(s).")
+            else:
+                print("Reel produced no parseable video packages; "
+                      "the render step will derive captions from the text.")
+        except Exception as exc:  # noqa: BLE001
+            print(f"Video package step skipped: {exc}")
+    return md_path, json_path
