@@ -11,6 +11,8 @@ Researcher  ->  Writer  ->  Editor/Reviewer  ->  Approval queue  ->  (you approv
 ```
 
 1. **Trend Researcher** — finds timely topics in your niche and angles worth posting about.
+   It has a live web-search tool (Tavily), so its angles are grounded in current
+   results with source URLs, not just the model's training knowledge.
 2. **Content Writer** — turns the research into short, platform-ready draft posts.
 3. **Editor / Reviewer** — checks tone, clarity, and safety; removes anything spammy,
    misleading, or off-brand; writes the survivors into the approval queue.
@@ -32,10 +34,16 @@ Researcher  ->  Writer  ->  Editor/Reviewer  ->  Approval queue  ->  (you approv
 
 - CrewAI itself: free and open source.
 - The AI model is the only real cost. Free options:
-  - **Google Gemini API** — free tier (`GOOGLE_API_KEY`)
+  - **Google Gemini API** — free tier (`GOOGLE_API_KEY`, or the vault-held key
+    via the google-gemini connector — no key file needed)
   - **Groq** — free tier (`GROQ_API_KEY`)
   - Paid options (OpenAI, Anthropic/Claude, DeepSeek) also work — a single
     account posting daily is typically a few dollars a month.
+- **Model fallback** — when the vault-held OpenRouter key is connected, the
+  crew automatically falls back to OpenRouter's free models
+  (`openrouter/free`) if the Gemini call fails after its retries.
+- **Web search** — Tavily's Researcher plan is free (1,000 searches/month,
+  no card) via the vault-held key in the custom.tavily connector.
 - Facebook/Instagram posting via Meta's API: free. X (Twitter) is not
   included — its API is effectively paywalled.
 
@@ -101,6 +109,11 @@ src/
   queue_store.py     Approval-queue writing (shared by crew and demo)
   graphics.py        Runs the Two.js card renderer, records image paths
   publish.py         Meta Graph API publisher (dry-run by default)
+  vault_llm.py       Gemini LLM using the vault-held key (surrogate auth)
+  vault_openrouter_llm.py  OpenRouter free-model LLM (vault key, fallback)
+  fallback_llm.py    Wraps the primary LLM, falls back to OpenRouter
+  tavily_tool.py     Tavily web-search tool for the Researcher (vault key)
+  tavily_search.py   Plain-function Tavily search helper (non-crew use)
 graphics/
   make_card.js       Two.js headless renderer: one PNG card per post
 output/              Generated approval queues and images (git-ignored contents)

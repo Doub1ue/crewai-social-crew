@@ -47,28 +47,63 @@ def _vault_gemini_surrogate() -> str | None:
         return None
 
 
+def _vault_openrouter_available() -> bool:
+    """True when the vault-held OpenRouter key (custom.openrouter
+    connector) exists, so the crew can fall back to OpenRouter's free
+    models. Checks presence only; the key itself never enters this
+    process (VaultOpenRouterLLM fetches the surrogate per request)."""
+    try:
+        import sys
+        sys.path.insert(0, "/opt/muse/skills/custom-connector-setup/bin")
+        from dynamic_credentials import dynamic_credential_entry
+        dynamic_credential_entry("custom.openrouter")
+        return True
+    except Exception:
+        return False
+
+
 def build_llm():
     """Model from .env (MODEL_NAME).
 
     Gemini keys, in order: GOOGLE_API_KEY from .env (native provider), or
     the vault-held key via the google-gemini connector (VaultGeminiLLM —
     the real key never leaves secure storage). Other providers use
-    CrewAI's native routing with their key from the environment."""
+    CrewAI's native routing with their key from the environment.
+
+    When the vault-held OpenRouter key is connected, the primary LLM is
+    wrapped in a FallbackLLM: if the primary call fails after its own
+    retries, the same call is retried against OpenRouter's free models
+    (VaultOpenRouterLLM)."""
     model = os.getenv("MODEL_NAME", "gemini/gemini-3.5-flash-lite")
     _sanitize_no_proxy()
+    primary = None
     if model.startswith("gemini/") and not os.getenv("GOOGLE_API_KEY"):
         if _vault_gemini_surrogate():
             from src.vault_llm import VaultGeminiLLM
-            return VaultGeminiLLM(
+            primary = VaultGeminiLLM(
                 model=model.split("/", 1)[1], temperature=0.7
             )
-    return LLM(model=model, temperature=0.7)
+    if primary is None:
+        primary = LLM(model=model, temperature=0.7)
+    if _vault_openrouter_available():
+        from src.fallback_llm import FallbackLLM
+        from src.vault_openrouter_llm import VaultOpenRouterLLM
+        return FallbackLLM(
+            primary,
+            VaultOpenRouterLLM(
+                model=os.getenv("OPENROUTER_MODEL", "openrouter/free"),
+                temperature=0.7,
+            ),
+        )
+    return primary
 
 
 def build_crew(topic: str | None = None) -> Crew:
     cfg = load_config()
     llm = build_llm()
     focus = topic or ", ".join(cfg.get("topics", [])) or cfg["niche"]
+
+    from src.tavily_tool import TavilySearchTool
 
     researcher = Agent(
         role="Social Media Trend Researcher",
@@ -79,10 +114,13 @@ def build_crew(topic: str | None = None) -> Crew:
         ),
         backstory=(
             "You track what people in this niche are actually talking about. "
+            "You have a live web search tool (Tavily) and you use it to "
+            "ground every angle in something real and current. "
             "You favor concrete, useful angles over generic motivational filler, "
             "and you never invent statistics, news, or quotes."
         ),
         llm=llm,
+        tools=[TavilySearchTool()],
         allow_delegation=False,
     )
 
@@ -122,8 +160,11 @@ def build_crew(topic: str | None = None) -> Crew:
         description=(
             f"Research posting angles for '{cfg['name']}' ({cfg['platform']}) "
             f"in the niche '{cfg['niche']}', focused on: {focus}. "
+            "Use the Tavily web search tool with a few short queries to find "
+            "what is current and real on this focus before settling on angles. "
             "Return 5-7 angles, each with: a one-line hook, why it matters to "
-            "the audience today, and one concrete fact or example to build on. "
+            "the audience today, and one concrete fact or example to build on "
+            "(with the source URL from the search results when you use one). "
             "Do not invent news or statistics; mark anything uncertain as an "
             "opinion angle instead."
         ),
